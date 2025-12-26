@@ -131,8 +131,9 @@ button:hover{
 /* ===== Toast popup ===== */
 .toast {
   position: fixed;
-  top: 18px;
-  right: 18px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   background: linear-gradient(135deg,#000000,#6b6bff,#ba6bff);
   color: white;
   padding: 14px 18px;
@@ -142,6 +143,7 @@ button:hover{
   animation: pop 0.25s ease-out;
   z-index: 9999;
 }
+
 
 @keyframes pop{
   from{ transform:translateY(-15px) scale(0.8); opacity:0; }
@@ -256,4 +258,5 @@ window.onload=function(){
 
 </body>
 </html>
+
 
