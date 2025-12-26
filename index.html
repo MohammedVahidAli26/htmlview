@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>HTML Converter — Rebuilt</title>
+        <!-- Bootstrap for layout -->
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+        <!-- Prism for syntax highlighting -->
+        <link href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.css" rel="stylesheet" />
+        <style>
+            :root{
+                --bg: linear-gradient(135deg,#0f0c29,#302b63,#24243e);
+                --panel: #ffffff;
+                --muted: #6c757d;
+            }
+            html,body{height:100%;}
+            body{
+                margin:0; min-height:100vh; font-family:Inter,Segoe UI,system-ui,Arial,sans-serif; background:var(--bg); color:#222;
+                display:flex; flex-direction:column;
+            }
+            .app-header{background:rgba(20,20,30,0.9); color:#fff;}
+            .editor-area{height:calc(100vh - 72px); padding:12px;}
+            .editor, .source, .preview{height:100%; min-height:360px; border-radius:6px;}
+            textarea.editor{width:100%; height:100%; resize:vertical; padding:12px; font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, 'Roboto Mono', monospace; font-size:14px;}
+            .panel{background:var(--panel); box-shadow:0 8px 30px rgba(2,6,23,0.4); border-radius:8px; overflow:hidden}
+            .controls .btn{margin-right:6px}
+            .time-display{font-weight:600}
+            .prism-container pre{margin:0; height:100%; overflow:auto}
+            iframe.preview{width:100%; height:100%; border:0}
+            .file-input{display:none}
+        </style>
+    </head>
+    <body>
+        <header class="app-header py-2">
+            <div class="container d-flex align-items-center justify-content-between">
+                <div class="d-flex align-items-center gap-2">
+                    <h5 class="mb-0 text-white">HTML Converter</h5>
+                    <span class="badge bg-info">Rebuilt</span>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <div id="currentTime" class="me-3 time-display text-white">--:--:--</div>
+                    <button id="fullscreenBtn" class="btn btn-sm btn-outline-light">Full Screen</button>
+                </div>
+            </div>
+        </header>
+
+        <main class="editor-area container-fluid">
+            <div class="row h-100 g-3">
+                <div class="col-12 col-xl-6 h-100">
+                    <div class="panel h-100 p-3 d-flex flex-column">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <strong>Editor</strong>
+                            <div class="controls">
+                                <label class="btn btn-sm btn-secondary mb-0" for="fileLoad">Load File</label>
+                                <input id="fileLoad" class="file-input" type="file" accept=".html,.htm,text/html" />
+                                <button id="saveBtn" class="btn btn-sm btn-primary">Save</button>
+                                <button id="downloadBtn" class="btn btn-sm btn-outline-primary">Download</button>
+                                <button id="copyBtn" class="btn btn-sm btn-outline-success">Copy</button>
+                                <button id="clearBtn" class="btn btn-sm btn-outline-danger">Clear</button>
+                            </div>
+                        </div>
+                        <textarea id="editor" class="editor form-control mb-2" placeholder="Type or paste your HTML here"></textarea>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="liveToggle" checked>
+                            <label class="form-check-label" for="liveToggle">Live Preview</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12 col-xl-6 h-100">
+                    <div class="panel h-100 p-2 d-flex flex-column">
+                        <ul class="nav nav-tabs">
+                            <li class="nav-item"><a class="nav-link active" data-tab="preview" href="#">Preview</a></li>
+                            <li class="nav-item"><a class="nav-link" data-tab="source" href="#">Source</a></li>
+                        </ul>
+                        <div class="tab-content p-2 flex-grow-1 d-flex">
+                            <div id="preview" class="tab-pane active w-100">
+                                <div class="h-100 panel p-2">
+                                    <iframe id="previewFrame" class="preview" sandbox="allow-same-origin allow-scripts"></iframe>
+                                </div>
+                            </div>
+                            <div id="source" class="tab-pane w-100 d-none prism-container">
+                                <pre class="language-html"><code id="sourceCode" class="language-html"></code></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <footer class="text-center py-2 text-muted small">Built with DOMPurify + PrismJS + Bootstrap</footer>
+
+        <!-- Libraries -->
+        <script src="https://cdn.jsdelivr.net/npm/dompurify@2.4.0/dist/purify.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-markup.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+        <script>
+            // Helpers
+            const editor = document.getElementById('editor');
+            const previewFrame = document.getElementById('previewFrame');
+            const sourceCode = document.getElementById('sourceCode');
+            const liveToggle = document.getElementById('liveToggle');
+            const saveBtn = document.getElementById('saveBtn');
+            const downloadBtn = document.getElementById('downloadBtn');
+            const copyBtn = document.getElementById('copyBtn');
+            const clearBtn = document.getElementById('clearBtn');
+            const fileLoad = document.getElementById('fileLoad');
+
+            // Time
+            function updateTime(){
+                const now = new Date();
+                let h = now.getHours(); const m = String(now.getMinutes()).padStart(2,'0'); const s = String(now.getSeconds()).padStart(2,'0');
+                const ampm = h>=12? 'PM':'AM'; h = h%12||12;
+                document.getElementById('currentTime').textContent = `${h}:${m}:${s} ${ampm}`;
+            }
+            setInterval(updateTime,1000); updateTime();
+
+            // Fullscreen
+            document.getElementById('fullscreenBtn').addEventListener('click', ()=>{
+                if(!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen();
+            });
+
+            // Load/save
+            function saveToLocal(){ localStorage.setItem('mismatch_html', editor.value); }
+            function loadFromLocal(){ const v = localStorage.getItem('mismatch_html'); if(v) editor.value = v; }
+
+            // Render preview safely using DOMPurify
+            function renderPreview(){
+                const raw = editor.value || '';
+                const sanitized = DOMPurify.sanitize(raw, {ADD_ATTR: ['target']});
+                // Use srcdoc so CSS + markup render in iframe; use same-origin to allow more realistic rendering
+                try{ previewFrame.srcdoc = sanitized; }catch(e){
+                    // fallback
+                    const doc = previewFrame.contentWindow.document; doc.open(); doc.write(sanitized); doc.close();
+                }
+            }
+
+            // Render source highlighted
+            function renderSource(){
+                const text = editor.value || '';
+                sourceCode.textContent = text;
+                if(window.Prism){ Prism.highlightElement(sourceCode); }
+            }
+
+            // Actions
+            saveBtn.addEventListener('click', ()=>{ saveToLocal(); alert('Saved to localStorage'); });
+            downloadBtn.addEventListener('click', ()=>{
+                const blob = new Blob([editor.value||''], {type:'text/html'});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a'); a.href = url; a.download = 'export.html'; a.click(); URL.revokeObjectURL(url);
+            });
+            copyBtn.addEventListener('click', async ()=>{
+                try{ await navigator.clipboard.writeText(editor.value||''); alert('Copied to clipboard'); }
+                catch(e){ alert('Copy failed — please allow clipboard permissions'); }
+            });
+            clearBtn.addEventListener('click', ()=>{ if(confirm('Clear editor and localStorage?')){ editor.value=''; localStorage.removeItem('mismatch_html'); renderPreview(); renderSource(); }});
+
+            fileLoad.addEventListener('change', (e)=>{
+                const f = e.target.files && e.target.files[0]; if(!f) return; const reader = new FileReader();
+                reader.onload = () => { editor.value = String(reader.result); saveToLocal(); renderPreview(); renderSource(); };
+                reader.readAsText(f);
+                fileLoad.value = null;
+            });
+
+            // Tabs
+            document.querySelectorAll('.nav-link').forEach(a=>{
+                a.addEventListener('click', (ev)=>{
+                    ev.preventDefault(); document.querySelectorAll('.nav-link').forEach(n=>n.classList.remove('active'));
+                    a.classList.add('active'); const tab = a.dataset.tab;
+                    document.querySelectorAll('.tab-pane').forEach(p=>{ p.classList.toggle('d-none', p.id!==tab); p.classList.toggle('active', p.id===tab); });
+                    if(tab==='source') renderSource();
+                });
+            });
+
+            // Live preview
+            let liveInterval = null;
+            function startLive(){ renderPreview(); renderSource(); if(liveInterval) clearInterval(liveInterval); liveInterval = setInterval(()=>{ renderPreview(); renderSource(); }, 900); }
+            function stopLive(){ if(liveInterval){ clearInterval(liveInterval); liveInterval=null; } }
+            liveToggle.addEventListener('change', ()=>{ if(liveToggle.checked) startLive(); else stopLive(); });
+
+            // Initialize
+            loadFromLocal(); renderPreview(); renderSource(); if(liveToggle.checked) startLive();
+
+            // Persist on edit (debounced)
+            let saveTimer = null;
+            editor.addEventListener('input', ()=>{ if(saveTimer) clearTimeout(saveTimer); saveTimer = setTimeout(()=>{ saveToLocal(); if(liveToggle.checked) renderPreview(); }, 600); });
+
+            // Make editor actions available via keyboard
+            editor.addEventListener('keydown', (e)=>{ if(e.ctrlKey && e.key==='s'){ e.preventDefault(); saveToLocal(); alert('Saved to localStorage'); } });
+        </script>
+    </body>
+</html>
